@@ -18,22 +18,11 @@ Ubuntu 22.04
 ROS2 Humble
 ```
 
-基础 ROS2 环境安装完成后，先安装工作空间编译和常用工具：
-
 ```bash
 sudo apt update
 sudo apt install -y \
-  build-essential \
-  cmake \
-  git \
   python3-colcon-common-extensions \
-  python3-rosdep
-```
-
-安装 FAST-LIO、速腾驱动和 `lidar_align` 编译所需依赖：
-
-```bash
-sudo apt install -y \
+  python3-rosdep \
   libeigen3-dev \
   libpcl-dev \
   libpcap-dev \
@@ -41,10 +30,7 @@ sudo apt install -y \
   libnlopt-cxx-dev \
   ros-humble-pcl-ros \
   ros-humble-pcl-conversions \
-  ros-humble-rosbag2-cpp \
-  ros-humble-tf2 \
-  ros-humble-tf2-ros \
-  ros-humble-rviz2
+  ros-humble-rosbag2-cpp
 ```
 
 如果是第一次使用该工作空间，建议初始化并更新 rosdep：

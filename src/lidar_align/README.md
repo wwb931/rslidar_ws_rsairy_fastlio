@@ -1,171 +1,117 @@
-# lidar_align ROS2 版本说明
+# lidar_align
 
-本包用于标定 3D 激光雷达与位姿传感器之间的外参。当前版本已从 ROS1/catkin 迁移到 ROS2/ament，可读取 ROS2 bag。
+## A simple method for finding the extrinsic calibration between a 3D lidar and a 6-dof pose sensor
 
-算法思路：给定一组 LiDAR 点云和一组位姿数据，优化 LiDAR 与位姿传感器之间的外参，使多帧点云融合后更加清晰、重合误差更小。
+**Note: Accurate results require highly non-planar motions, this makes the technique poorly suited for calibrating sensors mounted to cars.**
 
-> 注意：该方法需要比较充分的非平面运动。只有平面移动或缓慢单一方向运动时，标定结果可能不稳定。
+The method makes use of the property that pointclouds from lidars appear more 'crisp' when the calibration is correct. It does this as follows:
+1) A transformation between the lidar and pose sensor is set.
+2) The poses are used in combination with the above transformation to fuse all the lidar points into a single pointcloud.
+3) The sum of the distance between each point and its nearest neighbor is found.
+This process is repeated in an optimization that attempts to find the transformation that minimizes this distance.
 
-## ROS2 迁移内容
+## Installation
 
-- `CMakeLists.txt` 从 `catkin` 改为 `ament_cmake`。
-- `package.xml` 改为 ROS2 package format 3。
-- 参数读取从 `ros::NodeHandle` 改为 `rclcpp::Node`。
-- ROS1 `rosbag` 读取改为 `rosbag2_cpp::Reader`。
-- 消息类型改为 ROS2 命名空间，例如 `sensor_msgs::msg::PointCloud2`。
-- 新增 ROS2 启动文件 `launch/lidar_align.launch.py`。
-- 支持读取速腾点云中的 `timestamp/time/t` 字段，并转换为每点相对时间 `time_offset_us`。
+To install lidar_align, please install [ROS Indigo](http://wiki.ros.org/indigo/Installation/Ubuntu), [ROS Kinetic](http://wiki.ros.org/kinetic/Installation/Ubuntu) or [ROS Melodic](http://wiki.ros.org/melodic/Installation/Ubuntu).
 
-## 依赖安装
-
-以 Humble 为例：
-
-```bash
-sudo apt install libnlopt-dev libnlopt-cxx-dev ros-humble-pcl-conversions ros-humble-rosbag2-cpp
+The following additional system dependencies are also required:
 ```
-
-如果使用其他 ROS2 版本，把 `humble` 替换为对应版本名。
-
-## 编译
-
-假设工作空间为 `~/lidar_align`：
-
-```bash
-cd ~/lidar_align
-source /opt/ros/humble/setup.bash
-colcon build --packages-select lidar_align --symlink-install
-source install/setup.bash
+sudo apt-get install libnlopt-dev
 ```
+## Input Transformations
 
-包名仍然是：
+The final calibrations quality is strongly correlated with the quality of the transformation source and the range of motion observed. To ensure an accurate calibration the dataset should encompass a large range of rotations and translations. Motion that is approximately planner (for example a car driving down a street) does not provide any information about the system in the direction perpendicular to the plane, which will cause the optimizer to give incorrect estimates in this direction.
 
-```text
-lidar_align
+## Estimation proceedure
+For most systems the node can be run without tuning the parameters. By default two optimizations are performed, a rough angle only global optimization followed by a local 6-dof refinement.
+
+The node will load all messages of type `sensor_msgs/PointCloud2` from the given ROS bag for use as the lidar scans to process. The poses can either be given in the same bag file as `geometry_msgs/TransformStamped` messages or in a separate CSV file that follows the format of [Maplab](https://github.com/ethz-asl/maplab).
+
+## Visualization and Results
+
+The node will output it's current estimated transform while running. To view this your launchfile must set `output="screen"` in the `<node/>` section. See the given launchfile for an example.
+
+Once the optimization finishes the transformation parameters will be printed to the console. An example output is as follows:
 ```
+Active Transformation Vector (x,y,z,rx,ry,rz) from the Pose Sensor Frame to  the Lidar Frame:
+[-0.0608575, -0.0758112, 0.27089, 0.00371254, 0.00872398, 1.60227]
 
-所以启动和编译都使用 `lidar_align`，外层文件夹名字不影响。
+Active Transformation Matrix from the Pose Sensor Frame to  the Lidar Frame:
+-0.0314953  -0.999473  0.0078319 -0.0608575
+  0.999499 -0.0314702 0.00330021 -0.0758112
+ -0.003052 0.00793192   0.999964    0.27089
+         0          0          0          1
 
-## 输入数据要求
+Active Translation Vector (x,y,z) from the Pose Sensor Frame to  the Lidar Frame:
+[-0.0608575, -0.0758112, 0.27089]
 
-ROS2 bag 至少需要包含：
+Active Hamiltonen Quaternion (w,x,y,z) the Pose Sensor Frame to  the Lidar Frame:
+[0.69588, 0.00166397, 0.00391012, 0.718145]
 
-```text
-sensor_msgs/msg/PointCloud2
-sensor_msgs/msg/Imu
+Time offset that must be added to lidar timestamps in seconds:
+0.00594481
+
+ROS Static TF Publisher: <node pkg="tf" type="static_transform_publisher" name="pose_lidar_broadcaster" args="-0.0608575 -0.0758112 0.27089 0.00166397 0.00391012 0.718145 0.69588 POSE_FRAME LIDAR_FRAME 100" />
 ```
+If the path has been set the results will also be saved to a text file. 
 
-如果使用 CSV 位姿文件，则 bag 只需要包含点云，位姿从 CSV 读取。
+As a method of evaluating the quality of the alignment, if the needed path is set all points used for alignment will be projected into a single pointcloud and saved as a ply. An example of such a pointcloud can be seen below.
 
-当前程序会自动读取 bag 中所有 `PointCloud2` 和 `Imu` 类型消息。如果 bag 中存在多个点云话题或多个 IMU 话题，建议先重新录制一个只包含目标话题的 bag，例如：
+![example_pointcloud](https://user-images.githubusercontent.com/730680/48580820-7969c400-e920-11e8-9a69-e8aab2e74d20.png)
 
-```bash
-ros2 bag record /rslidar_points /rslidar_imu_data -o rs_align_bag
-```
+## CSV format
 
-## 运行
+| Column | Description |
+|--:|:--|
+1 | timestamp ns 
+2 | vertex index (not used) 
+3 | position x
+4 | position y
+5 | position z 
+6 | orientation quaternion w 
+7 | orientation quaternion x
+8 | orientation quaternion y 
+9 | orientation quaternion z 
 
-使用 ROS2 bag：
+Note that Maplab has two CSV exporters. This file-format is the same as produced by [exportPosesVelocitiesAndBiasesToCsv](https://github.com/ethz-asl/maplab/blob/master/console-plugins/vi-map-data-import-export-plugin/src/export-vertex-data.cc#L39) but differs from the output of [exportVerticesAndTracksToCsv](https://github.com/ethz-asl/maplab/blob/master/tools/csv-export/src/csv-export.cc#L35)
 
-```bash
-ros2 launch lidar_align lidar_align.launch.py bag_file:=/home/wwb/bag/rs_test
-```
+## Parameters
+------
 
-指定输出文件：
+### Scan Parameters
+| Parameter | Description | Default |
+| --------------------  |:-----------:| :-------:|
+| `min_point_distance` |  Minimum range a point can be from the lidar and still be included in the optimization. | 0.0 |
+| `max_point_distance` |  Maximum range a point can be from the lidar and still be included in the optimization. | 100.0 |
+| `keep_points_ratio` |  Ratio of points to use in the optimization (runtimes increase drastically as this is increased). | 0.01 |
+| `min_return_intensity` | The minimum return intensity a point requires to be considered valid. | -1.0 |
+| `motion_compensation` |  If the movement of the lidar during a scan should be compensated for. | true |
+| `estimate_point_times` | Uses the angle of the points in combination with `lidar_rpm` and `clockwise_lidar` to estimate the time a point was taken at. | false |
+| `lidar_rpm` | Spin rate of the lidar in rpm, only used with `estimate_point_times`. | 600 |
+| `clockwise_lidar` | True if the lidar spins clockwise, false for anti-clockwise, only used with `estimate_point_times`. | false |
 
-```bash
-ros2 launch lidar_align lidar_align.launch.py \
-  bag_file:=/home/wwb/bag/rs_test \
-  output_pointcloud_path:=/home/wwb/bag/rs_test/aligned.ply \
-  output_calibration_path:=/home/wwb/bag/rs_test/calibration.txt
-```
+### IO Parameters
+| Parameter | Description | Default |
+| --------------------  |:-----------:| :-------:|
+| `use_n_scans` |  Optimization will only be run on the first n scans of the dataset. | 2147483647 |
+| `input_bag_path` |  Path of rosbag containing sensor_msgs::PointCloud2 messages from the lidar. | N/A  |
+| `transforms_from_csv` | True to load scans from a csv file, false to load from the rosbag. | false |
+| `input_csv_path` |  Path of csv generated by Maplab, giving poses of the system to calibrate to. | N/A |
+| `output_pointcloud_path` |  If set, a fused pointcloud will be saved to this path as a ply when the calibration finishes. | "" |
+| `output_calibration_path` |  If set, a text document giving the final transform will be saved to this path when the calibration finishes. | "" |
 
-使用 CSV 位姿：
-
-```bash
-ros2 launch lidar_align lidar_align.launch.py \
-  bag_file:=/home/wwb/bag/rs_test \
-  transforms_from_csv:=true \
-  csv_file:=/home/wwb/poses.csv
-```
-
-默认输出路径：
-
-```text
-/tmp/lidar_align_points.ply
-/tmp/lidar_align_calibration.txt
-```
-
-## 常用参数
-
-可以直接运行节点并通过 `--ros-args -p` 传参：
-
-```bash
-ros2 run lidar_align lidar_align_node --ros-args \
-  -p input_bag_path:=/home/wwb/bag/rs_test \
-  -p keep_points_ratio:=0.002 \
-  -p use_n_scans:=100 \
-  -p max_evals:=80
-```
-
-常用参数说明：
-
-| 参数 | 说明 | 默认值 |
-| --- | --- | --- |
-| `input_bag_path` | ROS2 bag 目录 | 空 |
-| `use_n_scans` | 使用前 N 帧点云 | 不限制 |
-| `keep_points_ratio` | 随机保留点比例，越大越慢 | `0.01` |
-| `min_point_distance` | 最小点距离 | `0.0` |
-| `max_point_distance` | 最大点距离 | `100.0` |
-| `local` | 是否只做局部优化 | `false` |
-| `inital_guess` | 初始外参 `[x,y,z,rx,ry,rz,time]` | 全 0 |
-| `angular_range` | 局部角度搜索范围，单位 rad | `0.5` |
-| `translation_range` | 局部平移搜索范围，单位 m | `1.0` |
-| `max_time_offset` | 最大时间偏移搜索范围，单位 s | `0.1` |
-| `time_cal` | 是否估计时间偏移 | `true` |
-| `max_evals` | 优化迭代次数上限 | `200` |
-
-## 输出结果怎么看
-
-程序结束后会打印：
-
-```text
-Active Transformation Vector (x,y,z,rx,ry,rz) from the Pose Sensor Frame to the Lidar Frame
-Active Transformation Matrix from the Pose Sensor Frame to the Lidar Frame
-Active Translation Vector
-Active Hamiltonen Quaternion
-Time offset
-```
-
-这里的方向是：
-
-```text
-Pose Sensor Frame -> Lidar Frame
-```
-
-如果要填入 FAST-LIO，一般需要的是：
-
-```text
-LiDAR -> IMU
-```
-
-因此如果 Pose Sensor Frame 就是 IMU 坐标系，需要对输出结果取逆：
-
-```text
-R_lidar_imu = R_imu_lidar^T
-T_lidar_imu = -R_imu_lidar^T * T_imu_lidar
-```
-
-然后填入 FAST-LIO：
-
-```yaml
-extrinsic_T: [tx, ty, tz]
-extrinsic_R: [r00, r01, r02,
-              r10, r11, r12,
-              r20, r21, r22]
-```
-
-## 使用建议
-
-- 如果优化出的 `Time offset` 正好等于 `max_time_offset` 的边界，例如 `-0.1` 或 `0.1`，说明结果可能不可信。
-- 如果你已知安装方向大致为 90 度标准旋转，建议使用 `local:=true` 并给定接近真实值的 `inital_guess`。
-- 点云和 IMU 时间不同步、运动激励不足、bag 中混入多个点云/IMU 话题，都会导致结果发散。
+### Alinger Parameters
+| Parameter | Description | Default |
+| --------------------  |:-----------:| :-------:|
+| `local` |  If False a global optimization will be performed and the result of this will be used in place of the `inital_guess` parameter. | false |
+| `inital_guess` |  Initial guess to the calibration (x, y, z, rotation vector, time offset), only used if running in `local` mode. | [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] |
+| `max_time_offset` |  Maximum time offset between sensor clocks in seconds. | 0.1 |
+| `angular_range` | Search range in radians around the `inital_guess` during the local optimization stage. | 0.5 |
+| `translational_range` | Search range around the `inital_guess` during the local optimization stage. | 1.0 |
+| `max_evals` | Maximum number of function evaluations to run | 200 |
+| `xtol` | Tolerance of final solution | 0.0001 |
+| `knn_batch_size` | Number of points to send to each thread when finding nearest points | 1000 |
+| `knn_k` | Number of neighbors to consider in error function | 1 |
+| `global_knn_max_dist` | Error between points is limited to this value during global optimization. | 1.0 |
+| `local_knn_max_dist` | Error between points is limited to this value during local optimization. | 0.1 |
+| `time_cal` | True to perform time offset calibration | true |

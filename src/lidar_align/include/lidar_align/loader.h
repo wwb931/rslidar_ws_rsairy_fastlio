@@ -2,8 +2,7 @@
 #define LIDAR_ALIGN_LOADER_H_
 
 #include <pcl/point_types.h>
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <ros/ros.h>
 
 #include "lidar_align/sensors.h"
 
@@ -19,7 +18,7 @@ class Loader {
 
   Loader(const Config& config);
 
-  void parsePointcloudMsg(const sensor_msgs::msg::PointCloud2& msg,
+  void parsePointcloudMsg(const sensor_msgs::PointCloud2 msg,
                           LoaderPointcloud* pointcloud);
 
   bool loadPointcloudFromROSBag(const std::string& bag_path,
@@ -29,7 +28,7 @@ class Loader {
 
   bool loadTformFromMaplabCSV(const std::string& csv_path, Odom* odom);
 
-  static Config getConfig(const rclcpp::Node::SharedPtr& node);
+  static Config getConfig(ros::NodeHandle* nh);
 
  private:
   static bool getNextCSVTransform(std::istream& str, Timestamp* stamp,

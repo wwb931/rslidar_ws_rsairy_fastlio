@@ -1,0 +1,66 @@
+# ZVISION LiDAR Configuration for FAST-LIO (ROS1)
+
+
+common:
+    lid_topic: "/zvlidar_sdk/zvlidar_points_xyzirt"
+    imu_topic: "/zvlidar_sdk/zvlidar_imu_msg"
+    time_sync_en: false
+    time_offset_lidar_to_imu: 0.0
+
+
+max_iteration: 7
+point_filter_num: 4
+filter_size_corner: 0.5
+filter_size_surf: 0.5
+filter_size_map: 0.5
+
+runtime_pos_log_enable: false
+
+feature_extract_enable: false
+
+
+
+cube_side_length: 1000.0
+map_file_path: "./map.pcd"
+
+preprocess:
+    lidar_type: 5          # ZVISION = 5
+    scan_line: 96         # 96 or 192 lines depending on model
+    scan_rate: 10
+    timestamp_unit: 2      # US (microseconds)
+    blind: 0.3             # Minimum distance filter
+
+mapping:
+    acc_cov: 0.1          # IMU noise parameters
+    gyr_cov: 0.01
+    b_acc_cov: 0.001
+    b_gyr_cov: 0.001
+    fov_degree: 240.0
+    det_range: 70.0
+    extrinsic_est_en: false
+
+    # ZVISION NZ3 extrinsic parameters (adjust for your setup)
+    extrinsic_T: [ -0.0026, -0.06545, 0.0161 ]
+    extrinsic_R: [ 1.,  0.,  0.,
+                   0.,  1., 0.,
+                   0., 0.,  1.]
+
+
+    # extrinsic_T: [ -0.0026, -0.06545, 0.0161 ]
+    # extrinsic_R: [ -1.,  0.,  0.,
+    #                0.,  0., -1.,
+    #                0., -1.,  0.]
+
+
+publish:
+    path_en: true
+    scan_publish_en: true
+    dense_publish_en: false
+    scan_bodyframe_pub_en: true
+
+
+pcd_save:
+    pcd_save_en: true
+    interval: -1
+
+

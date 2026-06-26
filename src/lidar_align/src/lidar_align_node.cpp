@@ -1,4 +1,4 @@
-#include <rclcpp/rclcpp.hpp>
+#include <ros/ros.h>
 
 #include <algorithm>
 
@@ -9,62 +9,54 @@
 using namespace lidar_align;
 
 int main(int argc, char** argv) {
-  rclcpp::init(argc, argv);
+  ros::init(argc, argv, "lidar_align");
 
-  auto node = rclcpp::Node::make_shared("lidar_align");
+  ros::NodeHandle nh, nh_private("~");
 
-  Loader loader(Loader::getConfig(node));
+  Loader loader(Loader::getConfig(&nh_private));
 
   Lidar lidar;
   Odom odom;
 
   std::string input_bag_path;
-  RCLCPP_INFO(node->get_logger(), "Loading Pointcloud Data...");
-  node->declare_parameter<std::string>("input_bag_path", "");
-  node->get_parameter("input_bag_path", input_bag_path);
-  if (input_bag_path.empty()) {
-    RCLCPP_FATAL(node->get_logger(),
-                 "Could not find input_bag_path parameter, exiting");
+  ROS_INFO("Loading Pointcloud Data...");
+  if (!nh_private.getParam("input_bag_path", input_bag_path)) {
+    ROS_FATAL("Could not find input_bag_path parameter, exiting");
     exit(EXIT_FAILURE);
   } else if (!loader.loadPointcloudFromROSBag(
-                 input_bag_path, Scan::getConfig(node), &lidar)) {
-    RCLCPP_FATAL(node->get_logger(), "Error loading pointclouds from ROS bag.");
+                 input_bag_path, Scan::getConfig(&nh_private), &lidar)) {
+    ROS_FATAL("Error loading pointclouds from ROS bag.");
     exit(0);
   }
 
   bool transforms_from_csv;
-  node->declare_parameter<bool>("transforms_from_csv", false);
-  node->get_parameter("transforms_from_csv", transforms_from_csv);
+  nh_private.param("transforms_from_csv", transforms_from_csv, false);
   std::string input_csv_path;
-  RCLCPP_INFO(node->get_logger(), "Loading Transformation Data...");
+  ROS_INFO("Loading Transformation Data...                                ");
   if (transforms_from_csv) {
-    node->declare_parameter<std::string>("input_csv_path", "");
-    node->get_parameter("input_csv_path", input_csv_path);
-    if (input_csv_path.empty()) {
-      RCLCPP_FATAL(node->get_logger(),
-                   "Could not find input_csv_path parameter, exiting");
+    if (!nh_private.getParam("input_csv_path", input_csv_path)) {
+      ROS_FATAL("Could not find input_csv_path parameter, exiting");
       exit(EXIT_FAILURE);
     } else if (!loader.loadTformFromMaplabCSV(input_csv_path, &odom)) {
-      RCLCPP_FATAL(node->get_logger(), "Error loading transforms from CSV.");
+      ROS_FATAL("Error loading transforms from CSV.");
       exit(0);
     }
   } else if (!loader.loadTformFromROSBag(input_bag_path, &odom)) {
-    RCLCPP_FATAL(node->get_logger(), "Error loading transforms from ROS bag.");
+    ROS_FATAL("Error loading transforms from ROS bag.");
     exit(0);
   }
 
   if (lidar.getNumberOfScans() == 0) {
-    RCLCPP_FATAL(node->get_logger(), "No data loaded, exiting");
+    ROS_FATAL("No data loaded, exiting");
     exit(0);
   }
 
-  RCLCPP_INFO(node->get_logger(), "Interpolating Transformation Data...");
+  ROS_INFO("Interpolating Transformation Data...                          ");
   lidar.setOdomOdomTransforms(odom);
 
-  Aligner aligner(Aligner::getConfig(node));
+  Aligner aligner(Aligner::getConfig(&nh_private));
 
   aligner.lidarOdomTransform(&lidar, &odom);
 
-  rclcpp::shutdown();
   return 0;
 }

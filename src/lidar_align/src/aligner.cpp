@@ -2,36 +2,29 @@
 
 namespace lidar_align {
 
-namespace {
-
-template <typename T>
-void declareAndGet(const rclcpp::Node::SharedPtr& node, const std::string& name,
-                   T* value) {
-  node->declare_parameter<T>(name, *value);
-  node->get_parameter(name, *value);
-}
-
-}  // namespace
-
 Aligner::Aligner(const Config& config) : config_(config){};
 
-Aligner::Config Aligner::getConfig(const rclcpp::Node::SharedPtr& node) {
+Aligner::Config Aligner::getConfig(ros::NodeHandle* nh) {
   Aligner::Config config;
-  declareAndGet(node, "local", &config.local);
-  declareAndGet(node, "inital_guess", &config.inital_guess);
-  declareAndGet(node, "max_time_offset", &config.max_time_offset);
-  declareAndGet(node, "angular_range", &config.angular_range);
-  declareAndGet(node, "translation_range", &config.translation_range);
-  declareAndGet(node, "max_evals", &config.max_evals);
-  declareAndGet(node, "xtol", &config.xtol);
-  declareAndGet(node, "knn_batch_size", &config.knn_batch_size);
-  declareAndGet(node, "knn_k", &config.knn_k);
-  declareAndGet(node, "global_knn_max_dist", &config.global_knn_max_dist);
-  declareAndGet(node, "local_knn_max_dist", &config.local_knn_max_dist);
-  declareAndGet(node, "time_cal", &config.time_cal);
-  declareAndGet(node, "output_pointcloud_path", &config.output_pointcloud_path);
-  declareAndGet(node, "output_calibration_path",
-                &config.output_calibration_path);
+  nh->param("local", config.local, config.local);
+  nh->param("inital_guess", config.inital_guess, config.inital_guess);
+  nh->param("max_time_offset", config.max_time_offset, config.max_time_offset);
+  nh->param("angular_range", config.angular_range, config.angular_range);
+  nh->param("translation_range", config.translation_range,
+            config.translation_range);
+  nh->param("max_evals", config.max_evals, config.max_evals);
+  nh->param("xtol", config.xtol, config.xtol);
+  nh->param("knn_batch_size", config.knn_batch_size, config.knn_batch_size);
+  nh->param("knn_k", config.knn_k, config.knn_k);
+  nh->param("global_knn_max_dist", config.global_knn_max_dist,
+            config.global_knn_max_dist);
+  nh->param("local_knn_max_dist", config.local_knn_max_dist,
+            config.local_knn_max_dist);
+  nh->param("time_cal", config.time_cal, config.time_cal);
+  nh->param("output_pointcloud_path", config.output_pointcloud_path,
+            config.output_pointcloud_path);
+  nh->param("output_calibration_path", config.output_calibration_path,
+            config.output_calibration_path);
 
   return config;
 }
@@ -57,7 +50,7 @@ float Aligner::kNNError(const pcl::KdTreeFLANN<Point>& kdtree,
 float Aligner::lidarOdomKNNError(const Pointcloud& base_pointcloud,
                                  const Pointcloud& combined_pointcloud) const {
   // kill optimization if node stopped
-  if (!rclcpp::ok()) {
+  if (!ros::ok()) {
     throw std::runtime_error("ROS node died, exiting");
   }
 
@@ -246,8 +239,7 @@ void Aligner::lidarOdomTransform(Lidar* lidar, Odom* odom) {
   std::vector<double> x(num_params, 0.0);
 
   if (!config_.local) {
-    RCLCPP_INFO(rclcpp::get_logger("lidar_align"),
-                "Performing Global Optimization...");
+    ROS_INFO("Performing Global Optimization...                             ");
 
     std::vector<double> lb = {-M_PI, -M_PI, -M_PI};
     std::vector<double> ub = {M_PI, M_PI, M_PI};
@@ -264,8 +256,7 @@ void Aligner::lidarOdomTransform(Lidar* lidar, Odom* odom) {
     x = config_.inital_guess;
   }
 
-  RCLCPP_INFO(rclcpp::get_logger("lidar_align"),
-              "Performing Local Optimization...");
+  ROS_INFO("Performing Local Optimization...                                ");
 
   std::vector<double> lb = {
       -config_.translation_range, -config_.translation_range,
@@ -287,23 +278,22 @@ void Aligner::lidarOdomTransform(Lidar* lidar, Odom* odom) {
   optimize(lb, ub, &opt_data, &x);
 
   if (!config_.output_pointcloud_path.empty()) {
-    RCLCPP_INFO(rclcpp::get_logger("lidar_align"),
-                "Saving Aligned Pointcloud...");
+    ROS_INFO(
+        "Saving Aligned Pointcloud...                                     ");
     lidar->saveCombinedPointcloud(config_.output_pointcloud_path);
   }
 
   const std::string output_calibration =
       generateCalibrationString(lidar->getOdomLidarTransform(), x.back());
   if (!config_.output_calibration_path.empty()) {
-    RCLCPP_INFO(rclcpp::get_logger("lidar_align"),
-                "Saving Calibration File...");
+    ROS_INFO("Saving Calibration File...                                ");
 
     std::ofstream file;
     file.open(config_.output_calibration_path, std::ofstream::out);
     file << output_calibration;
     file.close();
   }
-  RCLCPP_INFO(rclcpp::get_logger("lidar_align"), "Final Calibration:");
+  ROS_INFO("\e[1mFinal Calibration:\e[0m                                ");
   std::cout << output_calibration;
 }
 

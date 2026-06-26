@@ -1,10 +1,10 @@
 #ifndef LIDAR_ALIGN_ALIGNER_H_
 #define LIDAR_ALIGN_ALIGNER_H_
 
+#include <ros/ros.h>
 #include <future>
 #include <limits>
 #include <nlopt.hpp>
-#include <rclcpp/rclcpp.hpp>
 
 #include "lidar_align/sensors.h"
 
@@ -41,7 +41,7 @@ class Aligner {
 
   Aligner(const Config& config);
 
-  static Config getConfig(const rclcpp::Node::SharedPtr& node);
+  static Config getConfig(ros::NodeHandle* nh);
 
   void lidarOdomTransform(Lidar* lidar, Odom* odom);
 

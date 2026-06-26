@@ -2,17 +2,6 @@
 
 namespace lidar_align {
 
-namespace {
-
-template <typename T>
-void declareAndGet(const rclcpp::Node::SharedPtr& node, const std::string& name,
-                   T* value) {
-  node->declare_parameter<T>(name, *value);
-  node->get_parameter(name, *value);
-}
-
-}  // namespace
-
 OdomTformData::OdomTformData(Timestamp timestamp_us, Transform T_o0_ot)
     : timestamp_us_(timestamp_us), T_o0_ot_(T_o0_ot) {}
 
@@ -95,17 +84,23 @@ Scan::Scan(const LoaderPointcloud& in, const Config& config)
   raw_points_.header = in.header;
 }
 
-Scan::Config Scan::getConfig(const rclcpp::Node::SharedPtr& node) {
+Scan::Config Scan::getConfig(ros::NodeHandle* nh) {
   Scan::Config config;
-  declareAndGet(node, "min_point_distance", &config.min_point_distance);
-  declareAndGet(node, "max_point_distance", &config.max_point_distance);
-  declareAndGet(node, "keep_points_ratio", &config.keep_points_ratio);
-  declareAndGet(node, "min_return_intensity", &config.min_return_intensity);
+  nh->param("min_point_distance", config.min_point_distance,
+            config.min_point_distance);
+  nh->param("max_point_distance", config.max_point_distance,
+            config.max_point_distance);
+  nh->param("keep_points_ratio", config.keep_points_ratio,
+            config.keep_points_ratio);
+  nh->param("min_return_intensity", config.min_return_intensity,
+            config.min_return_intensity);
 
-  declareAndGet(node, "estimate_point_times", &config.estimate_point_times);
-  declareAndGet(node, "clockwise_lidar", &config.clockwise_lidar);
-  declareAndGet(node, "motion_compensation", &config.motion_compensation);
-  declareAndGet(node, "lidar_rpm", &config.lidar_rpm);
+  nh->param("estimate_point_times", config.estimate_point_times,
+            config.estimate_point_times);
+  nh->param("clockwise_lidar", config.clockwise_lidar, config.clockwise_lidar);
+  nh->param("motion_compensation", config.motion_compensation,
+            config.motion_compensation);
+  nh->param("lidar_rpm", config.lidar_rpm, config.lidar_rpm);
 
   return config;
 }

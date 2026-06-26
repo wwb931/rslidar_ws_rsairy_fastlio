@@ -7,7 +7,7 @@
 #include <pcl/io/ply_io.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <rclcpp/rclcpp.hpp>
+#include <ros/ros.h>
 
 #include "lidar_align/transform.h"
 
@@ -73,7 +73,7 @@ class Scan {
 
   Scan(const LoaderPointcloud& pointcloud, const Config& config);
 
-  static Config getConfig(const rclcpp::Node::SharedPtr& node);
+  static Config getConfig(ros::NodeHandle* nh);
 
   void setOdomTransform(const Odom& odom, const double time_offset,
                         const size_t start_idx, size_t* match_idx);

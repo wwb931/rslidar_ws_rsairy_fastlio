@@ -21,23 +21,13 @@ Install common build dependencies:
 ```bash
 sudo apt update
 sudo apt install -y \
-  build-essential \
-  cmake \
-  git \
   python3-catkin-tools \
-  python3-catkin-pkg \
   libeigen3-dev \
   libpcl-dev \
   libpcap-dev \
   libnlopt-dev \
   libnlopt-cxx-dev \
-  libyaml-cpp-dev \
-  ros-noetic-pcl-ros \
-  ros-noetic-tf \
-  ros-noetic-cv-bridge \
-  ros-noetic-image-transport \
-  ros-noetic-rosbag \
-  ros-noetic-rviz
+  libyaml-cpp-dev
 ```
 
 ## Build

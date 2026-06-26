@@ -18,6 +18,7 @@ Ubuntu 22.04
 ROS2 Humble
 ```
 
+依赖项：
 ```bash
 sudo apt update
 sudo apt install -y \
